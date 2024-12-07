@@ -1,19 +1,30 @@
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Alert, SafeAreaView, KeyboardAvoidingView, Platform, Image } from 'react-native';
+
+// What is useState?
+// useState is a hook that allows you to add state to your functional components
 import { useState, useEffect } from 'react';
-import { initDatabase, registerUser, loginUser } from './utils/database';
+
+// What is database.js?
+// database.js is a file that contains the functions to interact with the database
+import { loginUser, registerUser } from './utils/database';
+
+// What is AsyncStorage?
+// AsyncStorage is a simple, unencrypted, asynchronous, persistent, key-value storage system that is global to the app.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ChangePassword from './components/ChangePassword';
 
 export default function App() {
     const [isLogin, setIsLogin] = useState(true)
     const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
+    const [email, setEmail] = useState('')
     const [isLoggedIn, setIsLoggedIn] = useState(false)
+    const [showChangePassword, setShowChangePassword] = useState(false);
 
     // what is useEffect?
     // this is a hook that runs when the component is mounted
     useEffect(() => {
-        initDatabase()
         checkLoginStatus()
     }, [])
 
@@ -25,25 +36,38 @@ export default function App() {
     }
 
     const handleSubmit = async () => {
-        if (!username || !password) {
+        if (isLogin && (!username || !password)) {
+            Alert.alert('Error', 'Please fill in all fields')
+            return
+        }
+        if (!isLogin && (!username || !password || !email)) {
             Alert.alert('Error', 'Please fill in all fields')
             return
         }
 
         try {
+            console.log(username, password);
             if (isLogin) {
-                const success = await loginUser(username, password)
-                if (success) {
+                console.log('login');
+                const response = await loginUser(username, password)
+                console.log(response)
+                if (response.success) {
                     await AsyncStorage.setItem('isLoggedIn', 'true')
                     setIsLoggedIn(true)
                     Alert.alert('Success', 'Logged in successfully')
                 } else {
-                    Alert.alert('Error', 'Invalid credentials')
+                    console.log(response);
+                    Alert.alert('Error', response.message || 'Invalid credentials')
                 }
             } else {
-                await registerUser(username, password)
-                Alert.alert('Success', 'Registration successful')
-                setIsLogin(true)
+                console.log('register');
+                const response = await registerUser(username, password, email)
+                if (response.success) {
+                    Alert.alert('Success', 'Registration successful')
+                    setIsLogin(true)
+                } else {
+                    Alert.alert('Error', response.message || 'Registration failed')
+                }
             }
         } catch (error) {
             Alert.alert('Error', error.message)
@@ -57,7 +81,21 @@ export default function App() {
         setPassword('')
     }
 
+    // will this run?
+    // yes, it will run if isLoggedIn is true
+    // this is a conditional rendering
     if (isLoggedIn) {
+        if (showChangePassword) {
+            return (
+                <SafeAreaView style={styles.container}>
+                    <ChangePassword
+                        username={username}
+                        onBack={() => setShowChangePassword(false)}
+                    />
+                </SafeAreaView>
+            );
+        }
+
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loggedInContainer}>
@@ -68,6 +106,14 @@ export default function App() {
                     <Text style={styles.welcomeTitle}>
                         Welcome, {username}!
                     </Text>
+
+                    <TouchableOpacity
+                        style={styles.changePasswordButton}
+                        onPress={() => setShowChangePassword(true)}
+                    >
+                        <Text style={styles.buttonText}>Change Password</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={handleLogout}
@@ -79,6 +125,10 @@ export default function App() {
         )
     }
 
+
+    // will this run?
+    // yes, it will run if isLoggedIn is false
+    // this is a conditional rendering
     return (
         <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
@@ -102,12 +152,23 @@ export default function App() {
                     <View style={styles.inputContainer}>
                         <TextInput
                             style={styles.input}
-                            placeholder="Username"
+                            placeholder={isLogin ? 'Email' : 'Username'}
                             value={username}
                             onChangeText={setUsername}
                             placeholderTextColor="#666"
                             autoCapitalize="none"
                         />
+                        {!isLogin && (
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Email"
+                                value={email}
+                                onChangeText={setEmail}
+                                placeholderTextColor="#666"
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                            />
+                        )}
                         <TextInput
                             style={styles.input}
                             placeholder="Password"
@@ -145,6 +206,8 @@ export default function App() {
     )
 }
 
+
+// styles is an object that contains the styles for the app
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -255,6 +318,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#FF3B30',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  changePasswordButton: {
+    backgroundColor: '#007AFF',
+    width: '100%',
+    height: 50,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#007AFF',
     shadowOffset: {
       width: 0,
       height: 2,
